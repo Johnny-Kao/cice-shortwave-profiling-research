@@ -38,7 +38,7 @@ jobs:
           assert n==1, (n,"unexpected shortwave field")
           t,n=re.subn(r"(?m)^\s*timer_stats\s*=\s*\.false\.", "    timer_stats    = .true.",t)
           assert n==1
-          t,n=re.subn(r"(?m)^\\s*ktherm\\s*=\\s*1\\b", "    ktherm        = 2",t)
+          t,n=re.subn(r"(?m)^\s*ktherm\s*=\s*1\b", "    ktherm        = 2",t)
           assert n==1, (n,"unexpected ktherm field")
           f.write_text(t)
           for key in ("shortwave","timer_stats","npt","ktherm","grid_type","atm_data_type","ocn_data_type"):
