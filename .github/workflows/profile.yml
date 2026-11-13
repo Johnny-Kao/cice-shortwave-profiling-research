@@ -40,8 +40,14 @@ jobs:
           assert n==1
           t,n=re.subn(r"(?m)^\s*ktherm\s*=\s*1\b", "    ktherm        = 2",t)
           assert n==1, (n,"unexpected ktherm field")
+          t,n=re.subn(r"(?m)^\s*atm_data_type\s*=\s*'calm'", "    atm_data_type = 'default'",t)
+          assert n==1, (n,"unexpected atmosphere forcing")
+          t,n=re.subn(r"(?m)^\s*ocn_data_type\s*=\s*'calm'", "    ocn_data_type = 'default'",t)
+          assert n==1, (n,"unexpected ocean forcing")
+          t,n=re.subn(r"(?m)^\s*default_season\s*=\s*'winter'", "    default_season = 'summer'",t)
+          assert n==1, (n,"unexpected default season")
           f.write_text(t)
-          for key in ("shortwave","timer_stats","npt","ktherm","grid_type","atm_data_type","ocn_data_type"):
+          for key in ("shortwave","timer_stats","npt","ktherm","grid_type","atm_data_type","default_season","ocn_data_type"):
               match=re.search(r"(?m)^\s*"+key+r"\s*=.*$",t)
               print(key,match.group(0) if match else "<MISSING>")
           (Path("profile-case-path.txt")).write_text(str(matches[0]))
