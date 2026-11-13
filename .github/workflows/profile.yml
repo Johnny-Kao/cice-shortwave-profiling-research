@@ -21,13 +21,13 @@ jobs:
       - name: Setup built-in no-external-data box test
         working-directory: cice
         run: |
-          ./cice.setup --test smoke --mach travisCI --env gnu --testid sw-profile --grid gbox80 --pes 1x1 --set boxnodyn
+          ./cice.setup --test smoke --mach travisCI --env gnu --testid sw-profile --grid gbox128 --pes 1x1 --set boxnodyn
       - name: Configure dEdd and verify test namelist
         working-directory: cice
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          matches=list(Path(".").glob("travisCI_gnu_smoke_gbox80*boxnodyn*"))
+          matches=list(Path(".").glob("travisCI_gnu_smoke_gbox128*boxnodyn*"))
           print("matches",matches)
           assert len(matches)==1
           f=matches[0]/"ice_in"
@@ -38,6 +38,8 @@ jobs:
           assert n==1, (n,"unexpected shortwave field")
           t,n=re.subn(r"(?m)^\s*timer_stats\s*=\s*\.false\.", "    timer_stats    = .true.",t)
           assert n==1
+          t,n=re.subn(r"(?m)^\\s*ktherm\\s*=\\s*1\\b", "    ktherm        = 2",t)
+          assert n==1, (n,"unexpected ktherm field")
           f.write_text(t)
           for key in ("shortwave","timer_stats","npt","ktherm","grid_type","atm_data_type","ocn_data_type"):
               match=re.search(r"(?m)^\s*"+key+r"\s*=.*$",t)
