@@ -1,0 +1,71 @@
+name: Profile CICE shortwave timer
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cice-profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq tcsh gfortran gcc g++ make openmpi-bin libopenmpi-dev netcdf-bin libnetcdf-dev libnetcdff-dev pkg-config
+      - name: Obtain official full CICE source
+        run: |
+          git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/CICE-Consortium/CICE.git cice
+          git -C cice rev-parse HEAD | tee cice-sha.txt
+          git -C cice submodule status | tee submodules.txt
+      - name: Setup built-in no-external-data box test
+        working-directory: cice
+        run: |
+          ./cice.setup --test smoke --mach travisCI --env gnu --testid sw-profile --grid gbox80 --pes 1x1 --set boxnodyn
+      - name: Configure dEdd and verify test namelist
+        working-directory: cice
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          matches=list(Path(".").glob("travisCI_gnu_smoke_gbox80*boxnodyn*"))
+          print("matches",matches)
+          assert len(matches)==1
+          f=matches[0]/"ice_in"
+          t=f.read_text()
+          import re
+          # The generated test's current shortwave is ccsm3; force full dEdd.
+          t,n=re.subn(r"(?m)^\s*shortwave\s*=\s*'ccsm3'", "    shortwave       = 'dEdd'",t)
+          assert n==1, (n,"unexpected shortwave field")
+          t,n=re.subn(r"(?m)^\s*timer_stats\s*=\s*\.false\.", "    timer_stats    = .true.",t)
+          assert n==1
+          f.write_text(t)
+          for key in ("shortwave","timer_stats","npt","ktherm","grid_type","atm_data_type","ocn_data_type"):
+              match=re.search(r"(?m)^\s*"+key+r"\s*=.*$",t)
+              print(key,match.group(0) if match else "<MISSING>")
+          (Path("profile-case-path.txt")).write_text(str(matches[0]))
+          PY
+      - name: Build and execute official full CICE smoke test
+        working-directory: cice
+        run: |
+          case_dir=$(<profile-case-path.txt)
+          cd "$case_dir"
+          ./cice.build
+          ./cice.submit
+          printf '\n--- Official test_output ---\n'
+          cat test_output
+          if grep -q '^FAIL ' test_output; then exit 2; fi
+          printf '\n--- Model timers ---\n'
+          grep -iE 'Shortwave|Timeloop|Dynamics|Advection|Column|Thermo|Total' logs/* | tail -100 || true
+      - name: Preserve logs and settings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cice-shortwave-profile
+          path: |
+            cice-sha.txt
+            submodules.txt
+            cice/profile-case-path.txt
+            cice/travisCI_gnu_smoke*/ice_in
+            cice/travisCI_gnu_smoke*/test_output
+            cice/travisCI_gnu_smoke*/logs/*
+          if-no-files-found: ignore
